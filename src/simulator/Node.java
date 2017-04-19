@@ -170,6 +170,7 @@ public class Node implements Serializable {
         MyLogger.logger.info("Node" + IP.toString() + ": Unicasting packet to " + dest);
         StatusManager.get_instance().showNodeStatus(this, "Unicasting " + packet + " to " + dest);
         StatusManager.get_instance().NodeSend(this, packet.type);
+
         if (Map_Manager.get_instance().sendPacket(packet, this, dest)) {
             return true;
         }
@@ -232,6 +233,7 @@ public class Node implements Serializable {
         } else {
             ttl = TTL_START;
         }
+
         discoveryiswaiting = new Object();  // note RREP Recieved that it is in discovery
         rrepPacketWrapper = null;
 //        To reduce congestion in a network, repeated attempts by a source node
@@ -254,15 +256,44 @@ public class Node implements Serializable {
                 e.printStackTrace();
             }
 
+
             if (rrepPacketWrapper != null) {//&& rrepPacketWrapper.getRrepPacket().seq_no == rreqPacket.seq_no){              //rrep packet recieved
+
+                /***********************************
+                 Adding for loop to generate routes from multiple RREPPackets
+
+                 RUN RL ALgorthm an return the most trusted route
+                 ************************************/
+
+//                try {
+//                    Thread.sleep(1000);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
+                synchronized (RREPPacketWrapperList) {
+                    if (RREPPacketWrapperList.size() > 0) {
+                        int RREPCount = 0;
+                        for (RREPPacketWrapper rrepWrapper : RREPPacketWrapperList) {
+                            RREPCount++;
+                            MyLogger.logger.info("----Node" + this + "RREPWrapperCount is " + RREPCount);
+                        }
+                    }
+                }
+
                 RREPPacketWrapper temprrepPacketWrapper = rrepPacketWrapper;//creates a new reference
-                rrepPacketWrapper = null;              //resets it for next try
-                discoveryiswaiting = null;      // we are not in discovery any more
+                rrepPacketWrapper = null;//resets it for next try
+                //////////////////////
+                // commented below line to receive multiple RREP at path reqeting node
+
+//                discoveryiswaiting = null;      // we are not in discovery any more
+                //////////////////////
                 MyLogger.logger.info("Node" + IP.toString() + ": first discovery for " + dest + " :successful");
                 Route foundRoute = generateRouteFromRREP(temprrepPacketWrapper);
                 foundRoute.resetIswaiting();
                 return foundRoute;
             }
+
+
 //            If a route is not received within NET_TRAVERSAL_TIME milliseconds
             if (ttl >= TTL_THRESHOLD) {
                 ttl = NET_DIAMETER;
@@ -333,6 +364,11 @@ public class Node implements Serializable {
      * @return true: if it can send the data <br/> false: if it can't send the data
      */
 
+    ////////////////////////////////
+    public ArrayList<RREPPacketWrapper> RREPPacketWrapperList = new ArrayList();
+    public ArrayList<Route> RouteListFromRREPPackets = new ArrayList();
+    ////////////////////////////////
+
     public boolean send_Data(Data data, Node dest) {
 
         MyLogger.logger.info("Node" + IP + ": Sending data to " + dest);
@@ -343,6 +379,8 @@ public class Node implements Serializable {
             StatusManager.get_instance().showNodeStatus(this, "Failed to send data to " + dest);
             return false;
         }
+
+
 
         DataPacket dataPacket = new DataPacket(data, route.getDestination(), this);
         //route.getLifeTime().reset();\
@@ -486,10 +524,16 @@ public class Node implements Serializable {
 
         // If reached here the RREQ is duplicate
 
-        if ( RREQPacket.dest.getIP().toString().equals(this.getIP().toString())) {
+        /*********************
+         Check RREQ source, seq no, previous hop
+         if these 3 are same. don't send RREP
+         return false if so.
+         */
+
+        if (RREQPacket.dest.getIP().toString().equals(this.getIP().toString())) {
             // If this node is the destination of duplicate RREP
-            MyLogger.logger.info("****Node"+this+": Duplicate RREQ Received from " + source + ",to dest "
-                    +RREQPacket.source+" BFC null? "+(bfc == null));
+            MyLogger.logger.info("****Node" + this + ": Duplicate RREQ Received from " + source + ",to dest "
+                    + RREQPacket.source + " BFC null? " + (bfc == null));
 
             return true;
         }

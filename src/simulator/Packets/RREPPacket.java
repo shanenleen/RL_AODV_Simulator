@@ -31,6 +31,7 @@ public class RREPPacket extends Packet {
 
 
     public void recieve(Node reciever, Node prev_hop) {
+
         new RREP_Recieved("RREP_Recieved"+reciever.getIP().toString(),reciever,
                     new RREPPacketWrapper(this,prev_hop));
             MyLogger.logger.info("Node"+ reciever.getIP().toString()+": RREP_Recieved from "+this.source+" through "+prev_hop);
